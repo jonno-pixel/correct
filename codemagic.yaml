@@ -1,0 +1,28 @@
+workflows:
+  ios-unsigned-ipa:
+    name: JJS Ongetekende iOS IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+    scripts:
+      - name: Bouw ongetekende .app
+        script: |
+          xcodebuild \
+            -project JJS.xcodeproj \
+            -scheme JJS \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build/DerivedData \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Verpak naar .ipa
+        script: |
+          mkdir -p build/Payload
+          cp -R build/DerivedData/Build/Products/Release-iphoneos/JJS.app build/Payload/
+          cd build
+          zip -r -y JJS-unsigned.ipa Payload
+    artifacts:
+      - build/JJS-unsigned.ipa
