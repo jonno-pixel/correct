@@ -1,0 +1,50 @@
+workflows:
+  ios-unsigned-ipa:
+    name: JJS Ongetekende iOS IPA
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      xcode: latest
+    scripts:
+      - name: Zoek of genereer JJS.xcodeproj en bouw .app
+        script: |
+          # Zoek project.yml of JJS.xcodeproj tot 3 niveaus diep
+          YML_PATH=$(find . -name "project.yml" -maxdepth 3 | head -n 1)
+          PROJ_PATH=$(find . -name "JJS.xcodeproj" -maxdepth 3 | head -n 1)
+
+          if [ -n "$PROJ_PATH" ]; then
+            PROJ_DIR=$(dirname "$PROJ_PATH")
+            cd "$PROJ_DIR"
+          elif [ -n "$YML_PATH" ]; then
+            PROJ_DIR=$(dirname "$YML_PATH")
+            cd "$PROJ_DIR"
+            echo "JJS.xcodeproj genereren vanuit project.yml..."
+            if ! command -v xcodegen >/dev/null 2>&1; then
+              brew install xcodegen
+            fi
+            xcodegen generate
+          else
+            echo "Fout: noch JJS.xcodeproj noch project.yml gevonden!"
+            find . -maxdepth 3
+            exit 1
+          fi
+
+          echo "Bouwen vanuit: $(pwd)"
+          xcodebuild \
+            -project JJS.xcodeproj \
+            -scheme JJS \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath "$CM_BUILD_DIR/build/DerivedData" \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+      - name: Verpak naar .ipa
+        script: |
+          mkdir -p "$CM_BUILD_DIR/build/Payload"
+          cp -R "$CM_BUILD_DIR/build/DerivedData/Build/Products/Release-iphoneos/JJS.app" "$CM_BUILD_DIR/build/Payload/"
+          cd "$CM_BUILD_DIR/build"
+          zip -r -y JJS-unsigned.ipa Payload
+    artifacts:
+      - build/JJS-unsigned.ipa
